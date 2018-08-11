@@ -4,6 +4,13 @@ library(OneR)
 library(dummies)
 library(plyr)
 
+replace_with_means_and_bins <- function(dt) {
+  Mean <- mean(dt, na.rm = TRUE)
+  dt[is.na(dt)] <- Mean
+  dt <- bin(dt, method="content")
+  dt
+  
+}
 
 setwd("/home/henrique/Documents/gne-data/")
 data <- read.csv("bxpeso_ml.csv",sep = ";", encoding="UTF-8")
@@ -68,11 +75,9 @@ data[c("Dietas_nome")][is.na(data[c("Dietas_nome")])] <- 999
 #Rearrange SOFA aval1 to match same bins as SOFA_admissao
 data$SOFA <- cut( data$SOFA, c(-Inf,4,6,7,10,17), right = FALSE, labels = c("Ate4", "Ac4Ate6", "Ac6Ate7", "Ac7Ate10", "Ac10Ate17"))
 #Replace NAs in PCR1 with the global mean
-meanPCR1 <- mean(data$PCR1, na.rm = TRUE)
-meanPCR1
-data[c("PCR1")][is.na(data[c("PCR1")])] <- meanPCR1
-data$PCR1 <- bin(data$PCR1, method="content", labels=c("Ate57.3", "Ac57.3Ate109", "Ac109Ate131", "Ac131Ate193", "Ac193Ate450"))
-table(data$HD1)
+
+data$PCR1 <- replace_with_means_and_bins(data$PCR1)
+table(data$PCR1)
 
 #left outer join on dietas
 data <- merge(data, dietas, by.x="Dietas_nome", by.y="Codigo", all.x = TRUE)

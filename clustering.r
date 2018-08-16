@@ -16,6 +16,8 @@ cdata[c("Traqueostomia")][is.na(cdata[c("Traqueostomia")])] <- 0
 #replace NA on Extubado based on Traqueostomia
 cdata[c("Extubado")][is.na(cdata[c("Extubado")])] <- ifelse(cdata$Traqueostomia[is.na(cdata[c("Extubado")])] > 0, 0, 1)
 
+#replace NA on SOFA (1st eval) with SOFA_admissao
+cdata[c("SOFA")][is.na(cdata[c("SOFA")])] <- cdata[c("SOFA_admissao")][is.na(cdata[c("SOFA")])]
 
 #fix TempoVM based on VM1 and TempoDeUTI 
 cdata[c("TempoVM")][is.na(cdata[c("TempoVM")]) & cdata$VM1 == 1] <- cdata[c("TempoDeUTI")][is.na(cdata[c("TempoVM")]) & cdata$VM1 == 1]
@@ -76,9 +78,22 @@ prepare_copies <- function(cdata, imputed_Data) {
   
   copies
 }
-
+#create list of datasets each one with some answer from mice imṕutation method
 datasets <- prepare_copies(cdata, imputed_Data)
 
+#all these attributes are actually categorical/factor
+factors <- c("MI_hospital", "DG_principal", "Morbidade", "Morb_imuno",
+             "VM1", "HD1", "Vasopressor1", "Sedoanalgesia1", "Previo_UTI",
+             "MI_UTI", "FR_sind_realimentacao", "Dieta", "Alta_UTI", "Extubado",
+             "Traqueostomia", "Obito")
+#so convert them into factors!
+datasets[[1]][,factors] <- data.frame(apply(datasets[[1]][,factors], 2, as.factor))
 
+
+
+
+
+#verify classes of each attribute
+#lapply(datasets[[1]], class)
 
 write.csv(datasets[[1]], "test.csv")

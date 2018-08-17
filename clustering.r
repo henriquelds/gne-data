@@ -1,4 +1,5 @@
 library(mice)
+library(plyr)
 
 setwd("/home/henrique/Documents/gne-data/")
 data <- read.csv("bxpeso_ml_mod.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
@@ -81,19 +82,28 @@ prepare_copies <- function(cdata, imputed_Data) {
 #create list of datasets each one with some answer from mice imṕutation method
 datasets <- prepare_copies(cdata, imputed_Data)
 
-#all these attributes are actually categorical/factor
-factors <- c("MI_hospital", "DG_principal", "Morbidade", "Morb_imuno",
-             "VM1", "HD1", "Vasopressor1", "Sedoanalgesia1", "Previo_UTI",
-             "MI_UTI", "FR_sind_realimentacao", "Dieta", "Alta_UTI", "Extubado",
-             "Traqueostomia", "Obito")
-#so convert them into factors!
-datasets[[1]][,factors] <- data.frame(apply(datasets[[1]][,factors], 2, as.factor))
+factorize_and_print <- function(datasets){
+  #all these attributes are actually categorical/factor
+  factors <- c("MI_hospital", "DG_principal", "Morbidade", "Morb_imuno",
+               "VM1", "HD1", "Vasopressor1", "Sedoanalgesia1", "Previo_UTI",
+               "MI_UTI", "FR_sind_realimentacao", "Dieta", "Alta_UTI", "Extubado",
+               "Traqueostomia", "Obito")
+  #so convert them into factors!
+  for (k in 1:length(datasets)){
+    datasets[[k]][,factors] <- data.frame(apply(datasets[[k]][,factors], 2, as.factor))
+    write.csv(datasets[[k]], paste0("ds_", k, "_cluster.csv"))
+  }
+  
+  datasets
+}
+
+datasets <- factorize_and_print(datasets)
 
 
-
-
+#ds1 <- read.csv("ds_1_cluster.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
+#ds1 <- ds1[c("Prontuario", "PCR1", "Lactato1", "Glicemia_min1")]
 
 #verify classes of each attribute
 #lapply(datasets[[1]], class)
 
-write.csv(datasets[[1]], "test.csv")
+

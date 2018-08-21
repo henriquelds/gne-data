@@ -1,7 +1,11 @@
 library(mice)
 library(plyr)
+library(cluster)
+library(Rtsne)
+library(dplyr)
+library(ggplot2)
 
-setwd("/home/henrique/Documents/gne-data/")
+setwd("C:\\Users\\henri\\OneDrive\\Documents\\gne-data")
 data <- read.csv("bxpeso_ml_mod.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
 
 
@@ -98,6 +102,32 @@ factorize_and_print <- function(datasets){
 }
 
 datasets <- factorize_and_print(datasets)
+
+ds1 <- datasets[[1]]
+gower_dist <- daisy(ds1[,-ncol(ds1)],
+                    metric = "gower")
+summary(gower_dist)
+
+pam_fit <- pam(gower_dist, diss = TRUE, k = 2)
+
+pam_results <- ds1 %>%
+  dplyr::select(-Prontuario) %>%
+  mutate(cluster = pam_fit$clustering) %>%
+  group_by(cluster) %>%
+  do(the_summary = summary(.))
+
+pam_results$the_summary
+
+tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
+
+tsne_data <- tsne_obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering),
+         name = ds1$Prontuario)
+
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
 
 
 #ds1 <- read.csv("ds_1_cluster.csv",sep = ",", encoding="UTF-8", na.strings = "NA")

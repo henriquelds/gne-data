@@ -5,14 +5,37 @@ library(Rtsne)
 library(dplyr)
 library(ggplot2)
 
-setwd("C:\\Users\\henri\\OneDrive\\Documents\\gne-data")
-data <- read.csv("bxpeso_ml_mod.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
+summary.numeric <- function (v, ...) {
+  s <- summary.default(v)
+  s <- signif(c(s,sd(v)),3)
+  names(s)[length(s)] <- "sd"
+  s
+}
 
+setwd("C:\\Users\\henri\\OneDrive\\Documents\\gne-data\\with_nutritional_facts")
+data <- read.csv("..\\bxpeso_ml_mod.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
 
 names(data)
 
 #remove second evaluation variables
-cdata <- data[c(-80:-111)] 
+
+cdata <- data[c(-1, -80:-111)] 
+class(cdata$Dieta)
+#cdata <- cdata[which(cdata$Dieta != 3),]
+names(cdata)
+
+#adjust some variables to be one-hot encoded factors
+cdata <- cdata[c(-117:-152)]
+cdata$D1_FL_GorduraLactea <- NULL
+names(cdata)
+toDummy <- c(88:104)
+cdata[toDummy] <- ifelse(cdata[toDummy] > 0, "1", "0")
+cdata[toDummy] <- lapply(cdata[toDummy], factor)
+
+#remove duplicate fibras variables
+cdata <- cdata[c(-84:-106, -115)]
+
+names(cdata)
 
 #replace NAs with 0s
 cdata[c("DM", "ICC", "Anorexia", "Marasmo", "Institucionalizado", "Caquexia", "Etilismo", "Sem_dieta")][is.na(cdata[c("DM", "ICC", "Anorexia", "Marasmo", "Institucionalizado", "Caquexia", "Etilismo", "Sem_dieta")])] <- 0
@@ -41,6 +64,8 @@ cdata$FR_sind_realimentacao <- ifelse(cdata$Anorexia + cdata$Marasmo + cdata$Ins
 
 cdata$Morb_imuno <- ifelse(cdata$SIDA + cdata$Cancer + cdata$Cancer_hematologico > 0, 1, 0)
 
+cdata$Repo_vitaminas <- ifelse(cdata$Tiamina1 + cdata$Vitaminas_outras1 > 0, 1, 0)
+
 #modify variable Alta_UTI to contain death trajectory if any
 temp <- cdata$Alta_UTI - cdata$Obito
 cdata$Alta_UTI <- mapvalues(temp, c("-1", "0", "1"), c("Obito", "AltaSeqObito", "Alta"))
@@ -57,12 +82,18 @@ pink <- c("Idade", "MI_hospital", "DG_principal", "Morbidade", "Morb_imuno", "IM
 green <- c("Previo_UTI", "MI_UTI", "FR_sind_realimentacao", "PCR1", "Lactato1",
            "Glicemia_max1", "Glicemia_min1", "Dieta")
 
-endVars <- c("Alta_UTI", "Extubado", "Traqueostomia", "Obito", "Prontuario")
+yellow <- c("Temp_max1", "Potassio1", "Repo_vitaminas","Total_kcal_peso1")
 
+endVars <- c("Alta_UTI", "Extubado", "Traqueostomia", "Obito", "Prontuario", "Dietas_nome")
+
+names(cdata)
 #remove diet variables for now....
-cdata <- cdata[c(-85:-153)] 
+dietVars <- names(cdata)[c(84:91)]
+#cdata <- cdata[c(-84:-145)] 
 
-cdata <- cdata[c(pink, green, endVars)]
+cdata <- cdata[c(pink, green, dietVars, endVars )]
+names(cdata)
+cdata[which(cdata$Dietas_nome==999), dietVars] <- NA
 
 regData <- cdata[c("SOFA_admissao", "SAPS3", "APACHEII", "PCR1", "Lactato1", "Glicemia_min1")]
 imputed_Data <- mice(regData, m=5, maxit = 50, method = 'pmm', seed = 500, print=FALSE)
@@ -83,7 +114,7 @@ prepare_copies <- function(cdata, imputed_Data) {
   
   copies
 }
-#create list of datasets each one with some answer from mice imṕutation method
+#create list of datasets each one with some answer from mice imputation method
 datasets <- prepare_copies(cdata, imputed_Data)
 
 factorize_and_print <- function(datasets){
@@ -91,7 +122,7 @@ factorize_and_print <- function(datasets){
   factors <- c("MI_hospital", "DG_principal", "Morbidade", "Morb_imuno",
                "VM1", "HD1", "Vasopressor1", "Sedoanalgesia1", "Previo_UTI",
                "MI_UTI", "FR_sind_realimentacao", "Dieta", "Alta_UTI", "Extubado",
-               "Traqueostomia", "Obito")
+               "Traqueostomia", "Obito", "Dietas_nome")
   #so convert them into factors!
   for (k in 1:length(datasets)){
     datasets[[k]][,factors] <- data.frame(apply(datasets[[k]][,factors], 2, as.factor))
@@ -103,20 +134,57 @@ factorize_and_print <- function(datasets){
 
 datasets <- factorize_and_print(datasets)
 
-ds1 <- datasets[[1]]
-gower_dist <- daisy(ds1[,-ncol(ds1)],
+
+
+
+ds1 <- datasets[[3]]
+#to remove target attributes so the algorithm is not aware of them a priori
+targetVars = c("Alta_UTI", "Obito", "Prontuario", "Dietas_nome")
+#keep extubado and traqueostomia
+myvars <- names(ds1) %in% targetVars
+names(ds1[!myvars])
+
+gower_dist <- daisy(ds1[!myvars],
                     metric = "gower")
 summary(gower_dist)
 
-pam_fit <- pam(gower_dist, diss = TRUE, k = 2)
+# sil_width <- c(NA)
+
+# for(i in 2:10){
+#
+#   pam_fit <- pam(gower_dist,
+#                  diss = TRUE,
+#                  k = i)
+#
+#   sil_width[i] <- pam_fit$silinfo$avg.width
+#
+# }
+#
+# # Plot sihouette width (higher is better)
+#
+# plot(1:10, sil_width,
+#      xlab = "Number of clusters",
+#      ylab = "Silhouette Width")
+# lines(1:10, sil_width)
+
+pam_fit <- pam(gower_dist, diss = TRUE, k = 5)
+pam_fit$clustering
+
 
 pam_results <- ds1 %>%
-  dplyr::select(-Prontuario) %>%
-  mutate(cluster = pam_fit$clustering) %>%
+  dplyr::select(-one_of(targetVars)) %>%
+  dplyr::select_if(is.numeric) %>%
+  mutate(cluster = pam_fit$clustering, obito = ds1$Obito, altauti = ds1$Alta_UTI, dieta_cod = ds1$Dietas_nome) %>%
   group_by(cluster) %>%
   do(the_summary = summary(.))
 
 pam_results$the_summary
+
+write.csv(na.omit(data.frame(pam_results$the_summary)), "ds_k5_removing_NPO_ObitoAltaUTI_sumario_onlynumeric.csv")
+
+cdata[pam_fit$medoids[1],]
+
+class(pam_results)
 
 tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
 
@@ -124,10 +192,10 @@ tsne_data <- tsne_obj$Y %>%
   data.frame() %>%
   setNames(c("X", "Y")) %>%
   mutate(cluster = factor(pam_fit$clustering),
-         name = ds1$Prontuario)
+         name = ds1$Prontuario, obito = ds1$Obito, dietas_cod = ds1$Dietas_nome)
 
 ggplot(aes(x = X, y = Y), data = tsne_data) +
-  geom_point(aes(color = cluster))
+  geom_point(aes(color = cluster, shape = obito, size = 2))
 
 
 #ds1 <- read.csv("ds_1_cluster.csv",sep = ",", encoding="UTF-8", na.strings = "NA")

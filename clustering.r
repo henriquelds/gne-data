@@ -16,7 +16,6 @@ setwd("C:\\Users\\henri\\OneDrive\\Documents\\gne-data\\with_nutritional_facts")
 data <- read.csv("..\\bxpeso_ml_mod.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
 
 names(data)
-
 #remove second evaluation variables
 
 cdata <- data[c(-1, -80:-111)] 

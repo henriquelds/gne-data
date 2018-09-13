@@ -1,5 +1,11 @@
 library(OneR)
 
+replace_with_bins <- function(dt) {
+  dt <- bin(dt, method="content", na.omit=FALSE)
+  dt
+  
+}
+
 
 setwd("C:\\Users\\henri\\OneDrive\\Documents\\gne-data\\")
 data <- read.csv("bxpeso_ml_assoc.csv",sep = ",", encoding="UTF-8", na.strings = "NA")
@@ -63,3 +69,27 @@ cdata[toDummyD2] <- lapply(cdata[toDummyD2], factor)
 
 cdata$A0_IMC <- cut( cdata$A0_IMC, c(-Inf,16,17,18.5,25), right = FALSE, labels=c("Grave", "Moderada", "Leve", "Saudavel"))
 
+#,10,13:14,16:17,19:21, 24:26,29:39, 60:88,
+total <- c(1:170)
+numerical <- c(1,4,10,13:14,16:17,19:21, 24:26,29:39, 60:88,90:91,93:94, 96:97, 100:101, 104:114,135:163, 167:169)
+
+
+tofactor <- setdiff(total, numerical)
+cdata[tofactor] <- lapply(cdata[tofactor], factor)
+cdata[tofactor] <- mapply(function(n, f) {
+  levels(f) <- paste(n, levels(f), sep=":")
+  f
+}, names(cdata)[tofactor], cdata[tofactor])
+
+
+names(cdata)[numerical]
+cdata[numerical] <- replace_with_bins(cdata[numerical])
+
+cdata[numerical] <- mapply(function(n, f) {
+  levels(f) <- paste(n, levels(f), sep=":")
+  f
+}, names(cdata)[numerical], cdata[numerical])
+
+lapply(cdata, class)
+
+write.csv(cdata, file="df1_assoc_new.csv", row.names=FALSE)
